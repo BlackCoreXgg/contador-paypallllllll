@@ -1,40 +1,31 @@
-import express from "express";
-import fs from "fs";
+const express = require("express");
+const fs = require("fs");
+const cors = require("cors");
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+app.use(express.json());
+app.use(cors()); // ✅ permite que tu web pueda leer los datos
 
-// Función para leer el contador
-function leerContador() {
-  try {
-    const data = fs.readFileSync("contador.json", "utf8");
-    return JSON.parse(data);
-  } catch {
-    return { ventas: 0, compradores: 0 };
-  }
+// Cargar contador desde archivo o inicializar
+let contador = { ventas: 0, compradores: 0 };
+try {
+  contador = JSON.parse(fs.readFileSync("contador.json", "utf8"));
+} catch (err) {
+  console.log("No se encontró contador.json, inicializando en 0.");
 }
 
-// Función para guardar el contador
-function guardarContador(contador) {
-  fs.writeFileSync("contador.json", JSON.stringify(contador, null, 2));
-}
-
-// Endpoint que PayPal va a llamar cuando entra un pago
-app.post("/webhook", (req, res) => {
-  let contador = leerContador();
-  contador.ventas += 1;
-  contador.compradores += 1; // Podés ajustar lógica si querés únicos
-  guardarContador(contador);
-  res.sendStatus(200);
-});
-
-// Endpoint para consultar el contador
+// Endpoint para ver el contador
 app.get("/contador", (req, res) => {
-  let contador = leerContador();
   res.json(contador);
 });
 
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
+// Webhook de PayPal: cada pago suma +1
+app.post("/webhook", (req, res) => {
+  contador.ventas++;
+  contador.compradores++;
+  fs.writeFileSync("contador.json", JSON.stringify(contador));
+  res.sendStatus(200);
 });
 
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log("Servidor corriendo en puerto " + PORT));
