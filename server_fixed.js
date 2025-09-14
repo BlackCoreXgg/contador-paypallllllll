@@ -1,33 +1,40 @@
 import express from "express";
-import bodyParser from "body-parser";
+import fs from "fs";
 
 const app = express();
-app.use(bodyParser.json());
+const PORT = process.env.PORT || 3000;
 
-let ventas = 0;
-let compradores = new Set();
-
-// Webhook de PayPal
-app.post("/webhook/paypal", (req, res) => {
-  const pago = req.body;
-
-  if (pago.event_type === "PAYMENT.CAPTURE.COMPLETED") {
-    ventas++;
-    compradores.add(pago.resource.payer.email_address);
-    console.log("✅ Pago recibido:", pago.resource.payer.email_address);
+// Función para leer el contador
+function leerContador() {
+  try {
+    const data = fs.readFileSync("contador.json", "utf8");
+    return JSON.parse(data);
+  } catch {
+    return { ventas: 0, compradores: 0 };
   }
+}
 
+// Función para guardar el contador
+function guardarContador(contador) {
+  fs.writeFileSync("contador.json", JSON.stringify(contador, null, 2));
+}
+
+// Endpoint que PayPal va a llamar cuando entra un pago
+app.post("/webhook", (req, res) => {
+  let contador = leerContador();
+  contador.ventas += 1;
+  contador.compradores += 1; // Podés ajustar lógica si querés únicos
+  guardarContador(contador);
   res.sendStatus(200);
 });
 
-// Endpoint para la web
+// Endpoint para consultar el contador
 app.get("/contador", (req, res) => {
-  res.json({
-    ventas,
-    compradores: compradores.size
-  });
+  let contador = leerContador();
+  res.json(contador);
 });
 
-// Puerto dinámico (Render elige el puerto con la variable de entorno PORT)
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Servidor corriendo en http://localhost:${PORT}`);
+});
+
